@@ -1,3 +1,5 @@
+import { DEFAULT_OPTIONS, localize } from './utils.js';
+
 var showChangelogCheckbox = document.querySelector('#showChangelog');
 var autoCloseNotificationCheckbox = document.querySelector('#autoCloseNotification');
 var alwaysDisableExtensionCheckbox = document.querySelector('#alwaysDisableExtension');

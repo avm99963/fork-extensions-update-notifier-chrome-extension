@@ -1,13 +1,24 @@
-var NO_PERMISSIONS_GRANTED = 'NO_PERMISSIONS_GRANTED';
+export const NO_PERMISSIONS_GRANTED = 'NO_PERMISSIONS_GRANTED';
 
-var DEFAULT_OPTIONS = {
+export const DEFAULT_OPTIONS = {
   ALWAYS_DISABLE_EXTENSION: false,
   AUTO_CLOSE_NOTIFICATION: false,
   SHOW_CHANGELOG: true,
 }
 
+export const MESSAGES = {
+  GENERATE_ICON_AND_SEND_NOTIFICATION: 'GENERATE_ICON_AND_SEND_NOTIFICATION',
+  SEND_NOTIFICATION: 'SEND_NOTIFICATION',
+}
+export const TARGETS = {
+  OFFSCREEN: 'OFFSCREEN',
+  SERVICE_WORKER: 'SERVICE_WORKER',
+};
+
+export const EXTENSION_VERSIONS_KEY = '__extensionVersions__';
+
 // Localize all content.
-function localize() {
+export function localize() {
   var elements = document.querySelectorAll('[i18-content]');
   for (var element, i = 0; element = elements[i]; i++) {
     var messageName = element.getAttribute('i18-content');
@@ -16,7 +27,7 @@ function localize() {
 }
 
 // Attempts to get changelog if webstore extension page has one.
-function getWebstoreChangelog(extensionId, successCallback, errorCallback) {
+export function getWebstoreChangelog(extensionId, successCallback, errorCallback) {
   var permissions = { origins: ['https://chrome.google.com/*'] };
   chrome.permissions.contains(permissions, function(result) {
     if (!result) {
@@ -52,4 +63,25 @@ function getWebstoreChangelog(extensionId, successCallback, errorCallback) {
     xhr.onerror = errorCallback;
     xhr.send(null);
   });
+}
+
+export async function getExtensionVersions() {
+  const results = await chrome.storage.local.get(EXTENSION_VERSIONS_KEY);
+  return results[EXTENSION_VERSIONS_KEY] ?? {};
+}
+
+export async function getCurrentExtensionVersion(extensionId) {
+  return (await getExtensionVersions())[extensionId];
+}
+
+export async function saveCurrentExtensionVersion(extensionId, version) {
+  const extensionVersions = await getExtensionVersions();
+  extensionVersions[extensionId] = version;
+  await chrome.storage.local.set({ [EXTENSION_VERSIONS_KEY]: extensionVersions });
+}
+
+export async function removeCurrentExtensionVersion(extensionId) {
+  const extensionVersions = await getExtensionVersions();
+  delete extensionVersions[extensionId];
+  await chrome.storage.local.set({ [EXTENSION_VERSIONS_KEY]: extensionVersions });
 }

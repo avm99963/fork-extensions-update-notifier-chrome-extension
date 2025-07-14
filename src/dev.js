@@ -1,11 +1,12 @@
+import { saveCurrentExtensionVersion } from './utils.js';
+
 // This is only for me when I play with it during development.
-chrome.management.getSelf(function(extension) {
+chrome.management.getSelf(async function(extension) {
   if (extension.installType === 'development') {
-    localStorage.eignhdfgaldabilaaegmdfbajngjmoke = '0';
-    localStorage.gbchcmhmhahfdphkhkmpfmihenigjmpp = '0';
-    localStorage.hfhhnacclhffhdffklopdkcgdhifgngh = '0';
-    localStorage.knmdbhdejcjgpahocbnbbekpaehgghnk = '0';
-    localStorage.bebigdkelppomhhjaaianniiifjbgocn = '0';
-    localStorage.eignhdfgaldabilaaegmdfbajngjmoke = '0';
+    await saveCurrentExtensionVersion('eignhdfgaldabilaaegmdfbajngjmoke', '0');
+    await saveCurrentExtensionVersion('gbchcmhmhahfdphkhkmpfmihenigjmpp', '0');
+    await saveCurrentExtensionVersion('hfhhnacclhffhdffklopdkcgdhifgngh', '0');
+    await saveCurrentExtensionVersion('knmdbhdejcjgpahocbnbbekpaehgghnk', '0');
+    await saveCurrentExtensionVersion('bebigdkelppomhhjaaianniiifjbgocn', '0');
   }
 });

@@ -1,7 +1,7 @@
 {
    "background": {
-      "persistent": false,
-      "scripts": [ "utils.js", "notifications.js", "management.js" ]
+      "service_worker": "service_worker.js",
+      "type": "module"
    },
    "default_locale": "en",
    "description": "__MSG_extDescription__",
@@ -10,15 +10,13 @@
       "48": "images/48.png",
       "128": "images/128.png"
    },
-   "manifest_version": 2,
-   "minimum_chrome_version": "50.0.2661.50",
+   "manifest_version": 3,
    "name": "__MSG_extName__",
-   "optional_permissions": [ "https://chrome.google.com/*" ],
+   "optional_host_permissions": [ "https://chrome.google.com/*" ],
    "options_ui": {
-     "page": "options.html",
-     "chrome_style": true
+     "page": "options.html"
    },
-   "permissions": [ "alarms", "management", "notifications", "storage" ],
+   "permissions": [ "alarms", "management", "notifications", "offscreen", "storage" ],
    "version": "3.5",
    "version_name": "3.5"
 }

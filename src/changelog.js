@@ -1,3 +1,5 @@
+import { getWebstoreChangelog } from './utils';
+
 var changelog = document.getElementById('changelog');
 var message = document.getElementById('message');
 var source = document.getElementById('source');

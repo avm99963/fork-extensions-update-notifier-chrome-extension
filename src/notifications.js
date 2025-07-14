@@ -1,6 +1,12 @@
-var iconSize = 48 * devicePixelRatio;
-var notificationSize = 80 * devicePixelRatio;
-var buttonSize = 16 * devicePixelRatio;
+import { uninstallExtension } from './management.js';
+import { setUpOffscreenDocument } from './offscreen_utils.js';
+import { DEFAULT_OPTIONS, NO_PERMISSIONS_GRANTED, getWebstoreChangelog, MESSAGES, TARGETS } from './utils.js';
+
+// Hardcoded since we don't have access to window.devicePixelRatio from
+// a service worker.
+// TODO(avm99963): move this calculation to the offscreen document.
+const devicePixelRatio = 2;
+const buttonSize = 16 * devicePixelRatio;
 
 // Helper function which returns a basic notification options object.
 function getNotificationOptions(extensionId) {
@@ -8,7 +14,7 @@ function getNotificationOptions(extensionId) {
     type: 'basic',
     priority: 2,
     requireInteraction: true,
-    iconUrl: 'chrome://extension-icon/'+ extensionId +'/'+ iconSize +'/1'
+    extensionId,
   };
 }
 
@@ -17,39 +23,31 @@ function getButtonIconUrl(name) {
   return chrome.runtime.getURL('/images/' + name + '_' + buttonSize + '.png');
 }
 
-// Helper function which returns extension Icon Data Url.
-function getExtensionIconDataUrl(url, callback) {
-  var icon = new Image();
-  icon.onload = function() {
-    var canvas = document.createElement('canvas');
-    canvas.width = canvas.height = notificationSize;
-
-    var context = canvas.getContext('2d');
-
-    var iconLeft = iconTop = (notificationSize - iconSize) / 2;
-    context.drawImage(icon, iconLeft, iconTop);
-    callback(canvas.toDataURL('image/png'));
-  }
-  icon.src = url;
+// Helper function which displays a notification.
+async function showNotification(notificationId, options) {
+  await setUpOffscreenDocument();
+  chrome.runtime.sendMessage({
+    type: MESSAGES.GENERATE_ICON_AND_SEND_NOTIFICATION,
+    target: TARGETS.OFFSCREEN,
+    data: { notificationId, options },
+  });
 }
 
-// Helper function which displays a notification.
-function showNotification(notificationId, options) {
-  getExtensionIconDataUrl(options.iconUrl, function(iconDataUrl) {
-    options.iconUrl = iconDataUrl;
-    chrome.notifications.create(notificationId, options, function(){
-      chrome.storage.sync.get({autoCloseNotification: DEFAULT_OPTIONS.AUTO_CLOSE_NOTIFICATION}, function(results) {
-        if (results.autoCloseNotification) {
-          // Raises an alarm to close notification after 10s.
-          chrome.alarms.create(notificationId, { when: Date.now() + 10e3 });
-        }
-      });
+// Function called after the extension icon is retrieved in the
+// offscreen document.
+export function sendNotification(notificationId, options) {
+  chrome.notifications.create(notificationId, options, function(){
+    chrome.storage.sync.get({autoCloseNotification: DEFAULT_OPTIONS.AUTO_CLOSE_NOTIFICATION}, function(results) {
+      if (results.autoCloseNotification) {
+        // Raises an alarm to close notification after 10s.
+        chrome.alarms.create(notificationId, { when: Date.now() + 10e3 });
+      }
     });
   });
 }
 
 // Helper function to create notification Id
-function getNotificationId(extension) {
+export function getNotificationId(extension) {
   return extension.id + extension.version;
 }
 
@@ -63,7 +61,7 @@ function setExtensionUpdateNotificationOptions(extension, oldVersion, showChange
   // Make the icon gray and add "Enable" and "Uninstall" buttons if the
   // extension is disabled.
   if (!extension.enabled) {
-    options.iconUrl += '?grayscale=true';
+    options.showGrayScaleIcon = true;
     options.buttons.push({
       title: chrome.i18n.getMessage('enableButtonTitle'),
       iconUrl: getButtonIconUrl('action')
@@ -92,7 +90,7 @@ function setExtensionUpdateNotificationOptions(extension, oldVersion, showChange
 }
 
 // Show a notification when an extension has been updated.
-function showExtensionUpdateNotification(extension, oldVersion) {
+export function showExtensionUpdateNotification(extension, oldVersion) {
   var options;
   chrome.storage.sync.get({showChangelog: DEFAULT_OPTIONS.SHOW_CHANGELOG}, function(results) {
     // Don't show changelog button if user doesn't want it.
@@ -134,7 +132,7 @@ function showExtensionUninstalledNotification(extension) {
 }
 
 // Handle notifications actions on button Click.
-function onNotificationsButtonClicked(notificationId, buttonIndex) {
+export function onNotificationsButtonClicked(notificationId, buttonIndex) {
   var clickedNotification = {};
   clickedNotification[notificationId] = 'clickedByUser';
   chrome.storage.local.set(clickedNotification, function() {
@@ -158,7 +156,7 @@ function onNotificationsButtonClicked(notificationId, buttonIndex) {
 }
 
 // Clear notification if user clicks on it.
-function onNotificationsClicked(notificationId) {
+export function onNotificationsClicked(notificationId) {
   // Open new options page.
   if (notificationId === 'newOptions') {
     chrome.runtime.openOptionsPage();
@@ -171,7 +169,7 @@ function onNotificationsClicked(notificationId) {
 }
 
 // Warn the others that this notification has been closed by the user.
-function onNotificationsClosed(notificationId, closedByUser) {
+export function onNotificationsClosed(notificationId, closedByUser) {
   chrome.storage.local.get(notificationId, function(results) {
     if (closedByUser || results[notificationId] === 'clickedByUser') {
       var closedNotification = {};
@@ -182,7 +180,7 @@ function onNotificationsClosed(notificationId, closedByUser) {
 }
 
 // Close notification if user already closed it on another device.
-function onStorageChanged(changes, area) {
+export function onStorageChanged(changes, area) {
   for (var notificationId in changes) {
     if (changes[notificationId].newValue === 'closedByUser')
       chrome.notifications.clear(notificationId);
@@ -190,11 +188,11 @@ function onStorageChanged(changes, area) {
 }
 
 // Open extensions options page when user clicked on notification settings.
-function onNotificationsShowSettings() {
+export function onNotificationsShowSettings() {
   chrome.runtime.openOptionsPage();
 }
 
-function closeExtensionNotifications(extensionId) {
+export function closeExtensionNotifications(extensionId) {
  chrome.notifications.getAll(function(notificationIds) {
     Object.keys(notificationIds).forEach(function(notificationId) {
       if (notificationId.indexOf(extensionId) === 0) {
@@ -204,7 +202,7 @@ function closeExtensionNotifications(extensionId) {
   });
 }
 
-function onAlarm(alarm) {
+export function onAlarm(alarm) {
   // Show new options notification when alarm is received.
   if (alarm.name === 'newOptions') {
     chrome.storage.sync.get('newOptions', function(results) {
@@ -227,7 +225,7 @@ function onAlarm(alarm) {
   }
 }
 
-function onInstalled(details) {
+export function onInstalled(details) {
   // Display a Welcome notification if this extension is installed for the first time.
   if (details.reason === 'install') {
     var options = getNotificationOptions(chrome.runtime.id);
@@ -240,12 +238,3 @@ function onInstalled(details) {
   // Wait for 30 seconds before prompting user about new options.
   chrome.alarms.create('newOptions', { when: Date.now() + 30e3 });
 }
-
-// Register all listeners.
-chrome.alarms.onAlarm.addListener(onAlarm);
-chrome.notifications.onButtonClicked.addListener(onNotificationsButtonClicked);
-chrome.notifications.onClicked.addListener(onNotificationsClicked);
-chrome.notifications.onClosed.addListener(onNotificationsClosed);
-chrome.notifications.onShowSettings.addListener(onNotificationsShowSettings)
-chrome.storage.onChanged.addListener(onStorageChanged);
-chrome.runtime.onInstalled.addListener(onInstalled);
